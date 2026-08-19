@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: autocare-dash-manager
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
