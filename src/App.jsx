@@ -7,6 +7,9 @@ import { VehicleListModal } from './components/VehicleListModal';
 import { VehicleFormModal } from './components/VehicleFormModal';
 import { MaintenanceFormModal } from './components/MaintenanceFormModal';
 import { PrintReportView } from './components/PrintReportView';
+import { DiyTutorialsView } from './components/DiyTutorialsView';
+import { NearbyServicesView } from './components/NearbyServicesView';
+import { MonthlyCostDashboard } from './components/MonthlyCostDashboard';
 
 import {
   loadVehicles,
@@ -16,6 +19,7 @@ import {
   loadActiveVehicleId,
   saveActiveVehicleId,
 } from './utils/storage';
+import { calculateMetrics, calculateNextRevision } from './utils/calculations';
 import { Car, Wrench, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
 
 export function App() {
@@ -23,6 +27,7 @@ export function App() {
   const [maintenances, setMaintenances] = useState([]);
   const [activeVehicleId, setActiveVehicleId] = useState(null);
   const [viewMode, setViewMode] = useState('CURRENT'); // 'CURRENT' | 'CONSOLIDATED'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'maintenances' | 'diy' | 'nearby'
   
   // Toast notifications state
   const [toast, setToast] = useState(null);
@@ -46,7 +51,6 @@ export function App() {
     setActiveVehicleId(activeId);
   }, []);
 
-  // Sync state changes to LocalStorage
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
@@ -105,21 +109,12 @@ export function App() {
     saveMaintenances(remainingMaintenances);
 
     if (activeVehicleId === id) {
-      const nextId = remainingVehicles.length > 0 ? remainingVehicles[0].id : null;
-      setActiveVehicleId(nextId);
-      saveActiveVehicleId(nextId);
+      const nextActiveId = remainingVehicles.length > 0 ? remainingVehicles[0].id : null;
+      setActiveVehicleId(nextActiveId);
+      saveActiveVehicleId(nextActiveId);
     }
 
-    showToast(`Veículo ${target.model} e seu histórico foram removidos.`, 'info');
-  };
-
-  const handleUpdateVehicleKm = (vehicleId, newKm) => {
-    const updatedVehicles = vehicles.map((v) =>
-      v.id === vehicleId ? { ...v, currentKm: Number(newKm) } : v
-    );
-    setVehicles(updatedVehicles);
-    saveVehicles(updatedVehicles);
-    showToast('Quilometragem atualizada com sucesso!');
+    showToast(`Veículo e seus registros foram removidos.`);
   };
 
   // Maintenance CRUD
@@ -130,7 +125,7 @@ export function App() {
       updatedMaintenances = maintenances.map((m) =>
         m.id === maintData.id ? { ...m, ...maintData } : m
       );
-      showToast('Registro de manutenção atualizado!');
+      showToast(`Registro de manutenção atualizado com sucesso!`);
     } else {
       // Create
       const newM = {
@@ -138,39 +133,58 @@ export function App() {
         id: `m-${Date.now()}`,
       };
       updatedMaintenances = [...maintenances, newM];
-      showToast('Nova manutenção registrada com sucesso!');
+      showToast(`Nova manutenção salva com sucesso!`);
     }
 
     setMaintenances(updatedMaintenances);
     saveMaintenances(updatedMaintenances);
 
-    // If maintenance kmAtService is higher than vehicle's currentKm, update currentKm automatically
-    const currentV = vehicles.find((v) => v.id === maintData.vehicleId);
-    if (currentV && maintData.kmAtService > currentV.currentKm) {
-      handleUpdateVehicleKm(currentV.id, maintData.kmAtService);
+    // Update active vehicle KM if maintenance KM > current KM
+    const activeV = vehicles.find((v) => v.id === maintData.vehicleId);
+    if (activeV && Number(maintData.kmAtService) > Number(activeV.currentKm || 0)) {
+      const updatedV = vehicles.map((v) =>
+        v.id === activeV.id ? { ...v, currentKm: Number(maintData.kmAtService) } : v
+      );
+      setVehicles(updatedV);
+      saveVehicles(updatedV);
     }
   };
 
   const handleDeleteMaintenance = (id) => {
-    if (!window.confirm('Deseja realmente excluir esta manutenção do histórico?')) return;
+    if (!window.confirm('Deseja realmente excluir este registro de manutenção?')) return;
     const remaining = maintenances.filter((m) => m.id !== id);
     setMaintenances(remaining);
     saveMaintenances(remaining);
-    showToast('Registro de manutenção removido.', 'info');
+    showToast('Registro excluído com sucesso.');
   };
 
-  // Active Vehicle Object
-  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId) || null;
-
-  // Print PDF Trigger
   const handleExportPdf = () => {
     window.print();
   };
 
+  // Derived Active Vehicle and Metrics
+  const activeVehicle = vehicles.find((v) => v.id === activeVehicleId);
+
+  const relevantMaintenances = viewMode === 'CURRENT' && activeVehicle
+    ? maintenances.filter((m) => m.vehicleId === activeVehicle.id)
+    : maintenances;
+
+  const metrics = calculateMetrics(relevantMaintenances);
+  const nextRevision = calculateNextRevision(activeVehicle, maintenances);
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      
-      {/* App Topbar Header */}
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 animate-fadeIn">
+          <div className="flex items-center space-x-2 px-4 py-3 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-2xl">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            <span className="text-xs font-semibold">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Header */}
       <Header
         vehicles={vehicles}
         activeVehicleId={activeVehicleId}
@@ -185,92 +199,119 @@ export function App() {
           setIsMaintenanceFormOpen(true);
         }}
         onExportPdf={handleExportPdf}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 no-print">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         
-        {/* Toast Feedback Notification */}
-        {toast && (
-          <div className="fixed bottom-5 right-5 z-50 animate-bounce">
-            <div className={`px-4 py-3 rounded-2xl shadow-xl border flex items-center space-x-2.5 text-xs font-bold text-white ${
-              toast.type === 'info' ? 'bg-slate-900 border-slate-700' : 'bg-emerald-600 border-emerald-500'
-            }`}>
-              <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-              <span>{toast.message}</span>
-            </div>
-          </div>
-        )}
+        {/* Render Tab 1: Dashboard & Custos */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Alert Banner if revision is pending */}
+            <RevisionAlertBanner
+              nextRevision={nextRevision}
+              activeVehicle={activeVehicle}
+            />
 
-        {/* Empty State Banner if No Vehicles Exist */}
-        {vehicles.length === 0 && (
-          <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-8 rounded-3xl shadow-lg text-center space-y-4">
-            <div className="h-16 w-16 mx-auto rounded-2xl bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-              <Car className="h-8 w-8" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold">Bem-vindo ao AutoCare Dash Manager!</h2>
-              <p className="text-xs text-slate-300 max-w-md mx-auto mt-1">
-                Você ainda não possui nenhum veículo cadastrado. Adicione seu primeiro veículo para acompanhar revisões, gastos e próximas manutenções.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setEditingVehicle(null);
+            {/* Vehicle Hero Card & Financial KPI Summary */}
+            <KpiCards
+              metrics={metrics}
+              nextRevision={nextRevision}
+              activeVehicle={activeVehicle}
+              onOpenEditVehicle={(v) => {
+                setEditingVehicle(v);
                 setIsVehicleFormOpen(true);
               }}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition-all"
-            >
-              <PlusCircle className="h-4 w-4" />
-              <span>Cadastrar Primeiro Veículo</span>
-            </button>
+            />
+
+            {/* Monthly Cost Graphs & Breakdown */}
+            <MonthlyCostDashboard
+              vehicles={vehicles}
+              maintenances={maintenances}
+              activeVehicleId={activeVehicleId}
+            />
           </div>
         )}
 
-        {/* Dynamic Revision Alert Banner for Active Vehicle */}
-        {activeVehicle && viewMode === 'CURRENT' && (
-          <RevisionAlertBanner
-            activeVehicle={activeVehicle}
-            maintenances={maintenances}
-            onUpdateVehicleKm={handleUpdateVehicleKm}
-          />
+        {/* Render Tab 2: Histórico de Manutenções */}
+        {activeTab === 'maintenances' && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* View Mode Toggle: Active Vehicle vs Entire Fleet */}
+            <div className="flex items-center justify-between bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+              <div className="text-xs font-bold text-slate-300">
+                Escopo de Exibição das Manutenções:
+              </div>
+              <div className="flex items-center space-x-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setViewMode('CURRENT')}
+                  disabled={!activeVehicle}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    viewMode === 'CURRENT'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Veículo Ativo {activeVehicle ? `(${activeVehicle.model})` : ''}
+                </button>
+                <button
+                  onClick={() => setViewMode('CONSOLIDATED')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    viewMode === 'CONSOLIDATED'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Toda a Frota ({maintenances.length})
+                </button>
+              </div>
+            </div>
+
+            <MaintenanceTable
+              activeVehicle={activeVehicle}
+              maintenances={maintenances}
+              vehicles={vehicles}
+              viewMode={viewMode}
+              onOpenAddMaintenance={() => {
+                setEditingMaintenance(null);
+                setIsMaintenanceFormOpen(true);
+              }}
+              onEditMaintenance={(m) => {
+                setEditingMaintenance(m);
+                setIsMaintenanceFormOpen(true);
+              }}
+              onDeleteMaintenance={handleDeleteMaintenance}
+            />
+          </div>
         )}
 
-        {/* Financial KPI Cards Component */}
-        <KpiCards
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          activeVehicle={activeVehicle}
-          maintenances={maintenances}
-          vehiclesCount={vehicles.length}
-        />
+        {/* Render Tab 3: Faça Você Mesmo (DIY) */}
+        {activeTab === 'diy' && (
+          <div className="animate-fadeIn">
+            <DiyTutorialsView activeVehicle={activeVehicle} />
+          </div>
+        )}
 
-        {/* Maintenance History Table Component */}
-        <MaintenanceTable
-          activeVehicle={activeVehicle}
-          maintenances={maintenances}
-          vehicles={vehicles}
-          viewMode={viewMode}
-          onOpenAddMaintenance={() => {
-            setEditingMaintenance(null);
-            setIsMaintenanceFormOpen(true);
-          }}
-          onEditMaintenance={(m) => {
-            setEditingMaintenance(m);
-            setIsMaintenanceFormOpen(true);
-          }}
-          onDeleteMaintenance={handleDeleteMaintenance}
-        />
+        {/* Render Tab 4: Oficinas Próximas */}
+        {activeTab === 'nearby' && (
+          <div className="animate-fadeIn">
+            <NearbyServicesView />
+          </div>
+        )}
 
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200/80 py-4 text-center text-xs text-slate-500 no-print mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>AutoCare Dash Manager — Sistema de Gestão de Revisões</span>
-          <span className="text-slate-400">Dados salvos com segurança em LocalStorage</span>
-        </div>
-      </footer>
+      {/* Hidden Print Container for High Quality PDF Generation */}
+      <div className="hidden print:block print-container">
+        <PrintReportView
+          activeVehicle={activeVehicle}
+          maintenances={relevantMaintenances}
+          metrics={metrics}
+          nextRevision={nextRevision}
+          viewMode={viewMode}
+        />
+      </div>
 
       {/* Modals */}
       <VehicleListModal
@@ -280,12 +321,10 @@ export function App() {
         activeVehicleId={activeVehicleId}
         onSelectVehicle={handleSelectVehicle}
         onOpenAddVehicle={() => {
-          setIsVehicleListOpen(false);
           setEditingVehicle(null);
           setIsVehicleFormOpen(true);
         }}
-        onEditVehicle={(v) => {
-          setIsVehicleListOpen(false);
+        onOpenEditVehicle={(v) => {
           setEditingVehicle(v);
           setIsVehicleFormOpen(true);
         }}
@@ -307,15 +346,12 @@ export function App() {
         activeVehicle={activeVehicle}
       />
 
-      {/* High Quality Printable View for PDF Generation */}
-      <PrintReportView
-        vehicles={vehicles}
-        maintenances={maintenances}
-        activeVehicle={activeVehicle}
-      />
-
+      {/* Footer */}
+      <footer className="bg-slate-950 border-t border-slate-900 py-6 text-center text-xs text-slate-500 no-print">
+        <div className="max-w-7xl mx-auto px-4">
+          <p>© {new Date().getFullYear()} AutoCare Manager — Todos os direitos reservados.</p>
+        </div>
+      </footer>
     </div>
   );
 }
-
-export default App;

@@ -4,13 +4,20 @@
 
 @layer base {
   body {
-    background-color: #f8fafc;
-    color: #1e293b;
-    font-family: 'Inter', sans-serif;
+    background-color: #030712;
+    color: #f3f4f6;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Custom print media styles for high quality PDF export */
+/* Custom glassmorphism backdrop */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Print Styles */
 @media print {
   body {
     background-color: #ffffff !important;
@@ -39,9 +46,18 @@
   }
 }
 
-/* Custom Glassmorphism backdrop */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Smooth keyframes fade */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

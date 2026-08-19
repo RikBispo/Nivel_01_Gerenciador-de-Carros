@@ -1,182 +1,197 @@
 import React from 'react';
 import { 
-  ShieldCheck, 
-  Activity, 
-  AlertTriangle, 
+  Car, 
+  Wrench, 
   DollarSign, 
   TrendingUp, 
-  Car, 
-  Layers 
+  AlertCircle, 
+  CheckCircle2,
+  Calendar,
+  Gauge,
+  Tag,
+  Bike,
+  Truck,
+  Anchor,
+  Shield,
+  Bus,
+  Tractor,
+  Edit2
 } from 'lucide-react';
-import { formatCurrency, calculateMetrics } from '../utils/calculations';
-import { MAINTENANCE_TYPES } from '../types';
+import { formatCurrency, formatKm } from '../utils/calculations';
+import { VEHICLE_TYPES, DEFAULT_VEHICLE_PHOTOS } from '../types';
 
 export function KpiCards({
-  viewMode, // 'CURRENT' | 'CONSOLIDATED'
-  onViewModeChange,
+  metrics,
+  nextRevision,
   activeVehicle,
-  maintenances = [],
-  vehiclesCount = 0,
+  onOpenEditVehicle,
 }) {
-  // Filter maintenances based on view mode
-  const filteredMaintenances = viewMode === 'CURRENT' && activeVehicle
-    ? maintenances.filter((m) => m.vehicleId === activeVehicle.id)
-    : maintenances;
+  const getVehicleBadge = (typeId) => {
+    const vType = VEHICLE_TYPES[typeId] || VEHICLE_TYPES.CAR;
+    return (
+      <span className="inline-flex items-center space-x-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+        <span>{vType.label}</span>
+      </span>
+    );
+  };
 
-  const metrics = calculateMetrics(filteredMaintenances);
+  const activePhoto = activeVehicle?.imageUrl || DEFAULT_VEHICLE_PHOTOS[activeVehicle?.type] || DEFAULT_VEHICLE_PHOTOS.CAR;
 
   return (
-    <div className="space-y-4 no-print">
-      {/* Top Bar with View Mode Segmented Control */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-        <div className="flex items-center space-x-2">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-            <TrendingUp className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-800">Indicadores Financeiros</h2>
-            <p className="text-xs text-slate-500">
-              {viewMode === 'CURRENT' && activeVehicle
-                ? `Exibindo custos de: ${activeVehicle.model} (${activeVehicle.plate})`
-                : `Exibindo total consolidado de ${vehiclesCount} veículos`}
-            </p>
+    <div className="space-y-6">
+      {/* Featured Active Vehicle Card with Photo */}
+      {activeVehicle && (
+        <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            
+            {/* Vehicle Photo Container */}
+            <div className="relative lg:col-span-5 h-56 lg:h-auto min-h-[220px] bg-slate-950 overflow-hidden">
+              <img
+                src={activePhoto}
+                alt={activeVehicle.model}
+                className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                onError={(e) => {
+                  e.target.src = DEFAULT_VEHICLE_PHOTOS[activeVehicle?.type] || DEFAULT_VEHICLE_PHOTOS.CAR;
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-slate-950/40 lg:to-slate-900" />
+              
+              {/* Photo Overlay Badge */}
+              <div className="absolute top-3 left-3">
+                {getVehicleBadge(activeVehicle.type)}
+              </div>
+            </div>
+
+            {/* Vehicle Details */}
+            <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
+                    {activeVehicle.model}
+                  </h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="bg-slate-800 text-slate-200 border border-slate-700 px-3 py-1 rounded-xl text-xs font-bold font-mono">
+                      PLACA: {activeVehicle.plate || 'S/N'}
+                    </span>
+                    <span className="bg-slate-800 text-cyan-400 border border-slate-700 px-3 py-1 rounded-xl text-xs font-semibold flex items-center space-x-1">
+                      <Gauge className="h-3.5 w-3.5" />
+                      <span>{formatKm(activeVehicle.currentKm)}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onOpenEditVehicle(activeVehicle)}
+                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shadow-sm"
+                  title="Editar Dados do Veículo"
+                >
+                  <Edit2 className="h-4 w-4 text-indigo-400" />
+                </button>
+              </div>
+
+              {/* Status & Revision summary bar */}
+              {nextRevision && (
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-400 font-semibold uppercase tracking-wider">
+                      Status da Próxima Revisão
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full font-bold border text-[11px] ${nextRevision.badgeColor}`}>
+                      {nextRevision.status === 'OVERDUE'
+                        ? 'Revisão Atrasada'
+                        : nextRevision.status === 'WARNING'
+                        ? 'Atenção Próxima'
+                        : 'Em Dia'}
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-medium text-slate-200">
+                    {nextRevision.message}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 text-slate-400 border-t border-slate-900">
+                    <div>
+                      Última preventiva: <strong className="text-slate-200">{formatKm(nextRevision.lastPreventativeKm)}</strong>
+                    </div>
+                    <div className="text-right">
+                      Meta recomendada: <strong className="text-indigo-400">{formatKm(nextRevision.projectedNextKm)}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
+      )}
 
-        {/* Segmented Control Switcher */}
-        <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold self-start sm:self-auto">
-          <button
-            onClick={() => onViewModeChange('CURRENT')}
-            disabled={!activeVehicle}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              viewMode === 'CURRENT'
-                ? 'bg-white text-indigo-600 shadow-sm font-bold'
-                : 'text-slate-600 hover:text-slate-900 disabled:opacity-40'
-            }`}
-          >
-            <Car className="h-3.5 w-3.5" />
-            <span>Veículo Atual</span>
-          </button>
-          
-          <button
-            onClick={() => onViewModeChange('CONSOLIDATED')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all ${
-              viewMode === 'CONSOLIDATED'
-                ? 'bg-white text-indigo-600 shadow-sm font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span>Visão Consolidada ({vehiclesCount})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* KPI Cards Grid */}
+      {/* Financial & Operational KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Preventativa Card */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200/60">
-              {MAINTENANCE_TYPES.PREVENTATIVE}
-            </span>
-            <div className="p-2 rounded-xl bg-teal-50 text-teal-600">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {formatCurrency(metrics.totalPreventative)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Rotina & Preservação preventiva
-            </p>
-          </div>
-        </div>
-
-        {/* Preditiva Card */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200/60">
-              {MAINTENANCE_TYPES.PREDICTIVE}
-            </span>
-            <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
-              <Activity className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {formatCurrency(metrics.totalPredictive)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Monitoramento & Análise de desgaste
-            </p>
-          </div>
-        </div>
-
-        {/* Corretiva Card */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200/60">
-              {MAINTENANCE_TYPES.CORRECTIVE}
-            </span>
-            <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
-              <AlertTriangle className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {formatCurrency(metrics.totalCorrective)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Reparos não planejados & Quebras
-            </p>
-          </div>
-        </div>
-
-        {/* Total & Maior Gasto Card */}
-        <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-5 rounded-2xl shadow-md relative overflow-hidden flex flex-col justify-between">
+        {/* Card 1: Total Cost */}
+        <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 bg-indigo-900/60 px-2.5 py-1 rounded-full border border-indigo-700/50">
-              Custo Total
-            </span>
-            <div className="p-2 rounded-xl bg-indigo-600/30 text-indigo-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Investido</span>
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               <DollarSign className="h-5 w-5" />
             </div>
           </div>
-          
-          <div className="my-2">
-            <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              {formatCurrency(metrics.totalCost)}
-            </div>
-            <div className="text-xs text-indigo-200/80 mt-0.5">
-              {metrics.count} manutenção(ões) registrada(s)
-            </div>
+          <div className="text-2xl font-black text-white">
+            {formatCurrency(metrics.totalCost)}
           </div>
-
-          {/* Destaque Maior Gasto */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-            <span className="text-slate-400">Maior Gasto:</span>
-            {metrics.highestCategory ? (
-              <span className={`font-bold px-2 py-0.5 rounded text-[11px] ${
-                metrics.highestCategory.type === MAINTENANCE_TYPES.PREVENTATIVE
-                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                  : metrics.highestCategory.type === MAINTENANCE_TYPES.PREDICTIVE
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-              }`}>
-                {metrics.highestCategory.type} ({formatCurrency(metrics.highestCategory.amount)})
-              </span>
-            ) : (
-              <span className="text-slate-500 italic">Sem registros</span>
-            )}
-          </div>
+          <p className="text-xs text-slate-400">
+            Gasto acumulado no histórico registrado.
+          </p>
         </div>
 
+        {/* Card 2: Preventative Expenditure */}
+        <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Manutenção Preventiva</span>
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-emerald-400">
+            {formatCurrency(metrics.totalPreventative)}
+          </div>
+          <p className="text-xs text-slate-400">
+            {metrics.totalCost > 0
+              ? `${Math.round((metrics.totalPreventative / metrics.totalCost) * 100)}% em prevenção de falhas.`
+              : 'Nenhum valor acumulado.'}
+          </p>
+        </div>
+
+        {/* Card 3: Corrective Expenditure */}
+        <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Manutenção Corretiva</span>
+            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <AlertCircle className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-rose-400">
+            {formatCurrency(metrics.totalCorrective)}
+          </div>
+          <p className="text-xs text-slate-400">
+            Gastos com consertos e imprevistos.
+          </p>
+        </div>
+
+        {/* Card 4: Total Logs & Average */}
+        <div className="bg-slate-900/90 rounded-2xl p-5 border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Serviços & Média</span>
+            <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              <Wrench className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-cyan-400">
+            {metrics.count} <span className="text-xs font-normal text-slate-400">registros</span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Média de <strong className="text-slate-200">{formatCurrency(metrics.count > 0 ? metrics.totalCost / metrics.count : 0)}</strong> por serviço.
+          </p>
+        </div>
       </div>
     </div>
   );

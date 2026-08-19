@@ -1,157 +1,107 @@
-import React, { useState } from 'react';
-import { 
-  AlertOctagon, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Calendar, 
-  Gauge, 
-  Edit3, 
-  Sparkles,
-  ArrowRight
-} from 'lucide-react';
-import { calculateNextRevision, formatKm, formatDate } from '../utils/calculations';
+import React from 'react';
+import { AlertTriangle, Clock, Calendar, CheckCircle2, Download, Bell } from 'lucide-react';
+import { formatKm } from '../utils/calculations';
+import { openGoogleCalendarEvent, downloadIcsFile } from '../utils/calendarUtil';
 
-export function RevisionAlertBanner({
-  activeVehicle,
-  maintenances = [],
-  onUpdateVehicleKm,
-}) {
-  if (!activeVehicle) return null;
+export function RevisionAlertBanner({ nextRevision, activeVehicle }) {
+  if (!nextRevision || !activeVehicle) return null;
 
-  const revisionInfo = calculateNextRevision(activeVehicle, maintenances);
-  const [isEditingKm, setIsEditingKm] = useState(false);
-  const [newKmInput, setNewKmInput] = useState(activeVehicle.currentKm || 0);
+  const isOverdue = nextRevision.status === 'OVERDUE';
+  const isWarning = nextRevision.status === 'WARNING';
 
-  if (!revisionInfo) return null;
+  // Do not render banner if status is completely OK and mileage remaining is large (> 3000 km)
+  if (!isOverdue && !isWarning) return null;
 
-  const handleSaveKm = (e) => {
-    e.preventDefault();
-    const val = Number(newKmInput);
-    if (!isNaN(val) && val >= 0) {
-      onUpdateVehicleKm(activeVehicle.id, val);
-      setIsEditingKm(false);
-    }
+  const handleGoogleCalendar = () => {
+    const title = `Revisão Preventiva - ${activeVehicle.model} (${activeVehicle.plate})`;
+    const details = `Lembrete AutoCare Manager:\\nVeículo: ${activeVehicle.model}\\nPlaca: ${activeVehicle.plate}\\nQuilometragem Atual: ${activeVehicle.currentKm} km\\nQuilometragem Alvo da Revisão: ${nextRevision.projectedNextKm} km\\nStatus: ${nextRevision.message}`;
+    
+    // Set alarm date 3 days from today
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 3);
+
+    openGoogleCalendarEvent({
+      title,
+      details,
+      startDate: targetDate,
+      location: 'Oficina Mecânica de Preferência',
+    });
   };
 
-  const getStatusVisuals = () => {
-    switch (revisionInfo.status) {
-      case 'OVERDUE':
-        return {
-          bg: 'bg-rose-50 border-rose-200 text-rose-900',
-          badge: 'bg-rose-600 text-white shadow-md shadow-rose-600/30',
-          icon: <AlertOctagon className="h-6 w-6 text-rose-600 animate-bounce" />,
-          title: 'Atenção: Revisão Preventiva Vencida!',
-          sub: `A quilometragem atual (${formatKm(activeVehicle.currentKm)}) ultrapassou a projeção (${formatKm(revisionInfo.projectedNextKm)}).`,
-        };
-      case 'WARNING':
-        return {
-          bg: 'bg-amber-50 border-amber-200 text-amber-900',
-          badge: 'bg-amber-500 text-white shadow-md shadow-amber-500/20',
-          icon: <AlertTriangle className="h-6 w-6 text-amber-600" />,
-          title: 'Atenção: Próxima Revisão Próxima!',
-          sub: `Faltam menos de 1.000 km para atingir a meta da próxima revisão (${formatKm(revisionInfo.projectedNextKm)}).`,
-        };
-      case 'OK':
-      default:
-        return {
-          bg: 'bg-emerald-50/70 border-emerald-200 text-emerald-900',
-          badge: 'bg-emerald-600 text-white',
-          icon: <CheckCircle2 className="h-6 w-6 text-emerald-600" />,
-          title: 'Revisão Preventiva em Dia',
-          sub: `Sua próxima revisão está projetada para os ${formatKm(revisionInfo.projectedNextKm)}.`,
-        };
-    }
-  };
+  const handleDownloadIcs = () => {
+    const title = `Revisão Preventiva - ${activeVehicle.model} (${activeVehicle.plate})`;
+    const details = `Lembrete AutoCare Manager:\nVeículo: ${activeVehicle.model}\nPlaca: ${activeVehicle.plate}\nQuilometragem Alvo da Revisão: ${nextRevision.projectedNextKm} km\nStatus: ${nextRevision.message}`;
 
-  const visuals = getStatusVisuals();
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 3);
+
+    downloadIcsFile({
+      title,
+      details,
+      startDate: targetDate,
+      location: 'Oficina Mecânica',
+    });
+  };
 
   return (
-    <div className={`p-4 sm:p-5 rounded-2xl border ${visuals.bg} transition-all no-print shadow-sm`}>
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        
-        {/* Left Side: Status Icon & Title */}
+    <div
+      className={`rounded-3xl p-5 border shadow-2xl transition-all ${
+        isOverdue
+          ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+          : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+      }`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start space-x-3.5">
-          <div className="p-2.5 rounded-xl bg-white shadow-sm border border-slate-100 flex-shrink-0">
-            {visuals.icon}
+          <div
+            className={`p-3 rounded-2xl shrink-0 ${
+              isOverdue ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+            }`}
+          >
+            <AlertTriangle className="h-6 w-6" />
           </div>
-          <div>
+
+          <div className="space-y-1">
             <div className="flex items-center space-x-2">
-              <h3 className="text-base font-bold tracking-tight">{visuals.title}</h3>
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${visuals.badge}`}>
-                {revisionInfo.status === 'OVERDUE' ? 'VENCIDA' : revisionInfo.status === 'WARNING' ? 'PRÓXIMA' : 'OK'}
+              <h3 className="text-base font-bold text-white">
+                {isOverdue ? 'Alerta Crítico: Revisão Preventiva Vencida!' : 'Atenção: Revisão Próxima do Vencimento'}
+              </h3>
+              <span
+                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                  isOverdue ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}
+              >
+                {isOverdue ? 'Vencida' : 'Próxima'}
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 mt-1">{visuals.sub}</p>
 
-            {/* Quick Metrics Detail Pills */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <div className="bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200/60 flex items-center space-x-1.5 text-slate-700">
-                <Gauge className="h-3.5 w-3.5 text-slate-500" />
-                <span>Atual: <strong>{formatKm(activeVehicle.currentKm)}</strong></span>
-              </div>
-
-              <div className="bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200/60 flex items-center space-x-1.5 text-slate-700">
-                <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
-                <span>Meta Revisão: <strong>{formatKm(revisionInfo.projectedNextKm)}</strong></span>
-              </div>
-
-              {revisionInfo.lastPreventativeDate && (
-                <div className="bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200/60 flex items-center space-x-1.5 text-slate-700">
-                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Última Preventiva: <strong>{formatDate(revisionInfo.lastPreventativeDate)}</strong> ({formatKm(revisionInfo.lastPreventativeKm)})</span>
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {nextRevision.message} Recomendamos efetuar a troca de óleo e checagem dos itens de segurança para o veículo{' '}
+              <strong className="text-white">{activeVehicle.model}</strong> ({activeVehicle.plate}).
+            </p>
           </div>
         </div>
 
-        {/* Right Side: Quick Km Update Box */}
-        <div className="bg-white/90 p-3 rounded-xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 self-stretch lg:self-auto">
-          {isEditingKm ? (
-            <form onSubmit={handleSaveKm} className="flex items-center space-x-2 w-full">
-              <input
-                type="number"
-                value={newKmInput}
-                onChange={(e) => setNewKmInput(e.target.value)}
-                placeholder="Km Atual"
-                className="w-28 px-2 py-1 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="px-2.5 py-1 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500"
-              >
-                Salvar
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditingKm(false)}
-                className="px-2 py-1 text-xs text-slate-500 hover:text-slate-800"
-              >
-                Cancelar
-              </button>
-            </form>
-          ) : (
-            <div className="flex items-center justify-between w-full sm:w-auto space-x-3">
-              <div>
-                <span className="text-[11px] font-semibold uppercase text-slate-400 block">Odômetro</span>
-                <span className="text-sm font-bold text-slate-900">{formatKm(activeVehicle.currentKm)}</span>
-              </div>
-              <button
-                onClick={() => {
-                  setNewKmInput(activeVehicle.currentKm);
-                  setIsEditingKm(true);
-                }}
-                className="inline-flex items-center space-x-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
-                title="Atualizar odômetro do veículo"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                <span>Atualizar Km</span>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* Action Buttons for Calendar Reminders */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
+          <button
+            onClick={handleGoogleCalendar}
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold border border-slate-700 transition-colors shadow-sm"
+            title="Agendar Lembrete no Google Agenda"
+          >
+            <Calendar className="h-4 w-4 text-cyan-400" />
+            <span>Google Agenda</span>
+          </button>
 
+          <button
+            onClick={handleDownloadIcs}
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all"
+            title="Baixar Arquivo .ICS para Outlook / Apple Agenda"
+          >
+            <Bell className="h-4 w-4" />
+            <span>Baixar Alarm (.ics)</span>
+          </button>
+        </div>
       </div>
     </div>
   );
